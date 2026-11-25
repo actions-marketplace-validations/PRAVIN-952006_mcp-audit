@@ -2,6 +2,12 @@
 
 All notable changes to `mcp-audit` are documented in this file.
 
+## [0.4.0] - 2026-11-25
+### Added
+- **Auto-hardening (`mcp-audit fix <file> [--write]`):** Dry-run preview and in-place remediation for hardcoded secrets, `NODE_TLS_REJECT_UNAUTHORIZED=0`, wildcard `autoApprove`, and invisible Unicode Tag steganography.
+- **Zero-install CLI support (`npx github:PRAVIN-952006/mcp-audit`):** Added `#!/usr/bin/env node` shebang and `prepare` build hook so anyone can run `mcp-audit` without cloning first.
+- **README badges & comparison matrix** highlighting zero-dependency offline execution, Unicode Tag decoding, and GitHub Code Scanning SARIF 2.1.0 output.
+
 ## [0.3.0] - 2026-11-23
 ### Added
 - **Live Streamable-HTTP / SSE probing (`probeHttpServer`):** Supports remote MCP servers via JSON-RPC 2.0 `initialize` -> `Mcp-Session-Id` -> `tools/list`, parsing both `application/json` and `text/event-stream` SSE frames.
