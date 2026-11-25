@@ -1,0 +1,25 @@
+name: Bug Report
+description: Report a false positive, false negative, or CLI issue in mcp-audit
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: mcp-audit version & Node.js version
+      placeholder: "e.g., mcp-audit v0.4.0, Node.js v22.12.0"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal sanitized config / reproduction steps
+      description: Please redact any real secrets before pasting.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual behavior
+    validations:
+      required: true

@@ -1,0 +1,28 @@
+name: Propose a Security Rule
+description: Suggest a new MCP0xx, TOOL0xx, or RUG0xx detection rule
+labels: ["enhancement", "security-rule"]
+body:
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Rule Engine
+      options:
+        - "MCP0xx (Static config security)"
+        - "TOOL0xx (Tool poisoning / steganography / exfiltration)"
+        - "RUG0xx (Cryptographic lockfile / drift)"
+    validations:
+      required: true
+  - type: textarea
+    id: threat
+    attributes:
+      label: Threat model & concrete example
+      description: Describe the attack pattern and what a benign vs. risky config/tool schema looks like.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Suggested severity
+      options: ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    validations:
+      required: true
