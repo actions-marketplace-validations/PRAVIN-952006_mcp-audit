@@ -2,6 +2,13 @@
 
 All notable changes to `mcp-audit` are documented in this file.
 
+## [0.5.0] - 2026-11-25
+### Added
+- **Cross-server Toxic Flow / Lethal Trifecta detection (`TOOL009`):** Flags MCP sessions combining untrusted external-content readers, private local/data access, and outbound messaging/network sinks (bringing the rule engine to **21 built-in rules**).
+- **GitHub Step Summary / PR Comment Markdown reporter (`--format markdown`):** Generates ready-to-post Markdown summary tables with Grade, Risk Score, and per-finding remediations.
+- **Rule suppression flag (`--ignore <rule1,rule2>`):** Allows intentional CI exceptions with automatic grade/risk-score recalculation.
+- **Upgraded terminal hero visual (`assets/demo.svg`), 3-engine architecture diagram (`assets/architecture.svg`), GitHub Issue/PR templates, and expanded 20-repo empirical ecosystem benchmark (`docs/ECOSYSTEM_AUDIT.md`).**
+
 ## [0.4.0] - 2026-11-25
 ### Added
 - **Auto-hardening (`mcp-audit fix <file> [--write]`):** Dry-run preview and in-place remediation for hardcoded secrets, `NODE_TLS_REJECT_UNAUTHORIZED=0`, wildcard `autoApprove`, and invisible Unicode Tag steganography.

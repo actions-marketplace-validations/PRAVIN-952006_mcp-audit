@@ -6,6 +6,7 @@ import {
   auditParsedSources,
   buildLockfile,
   formatJsonReport,
+  formatMarkdownReport,
   formatSarifReport,
   formatTextReport,
   hardenMcpJsonContent,
@@ -26,12 +27,13 @@ USAGE:
   mcp-audit fix <file> [--write]          Auto-harden secrets, TLS overrides, wildcard autoApprove & Unicode stego
   mcp-audit pin [paths...] [--out FILE]   Pin SHA-256 hashes of configs & tool schemas to a lockfile (--probe for live)
   mcp-audit verify [paths...] [options]   Detect silent rug-pull mutations against a pinned lockfile (--probe for live)
-  mcp-audit demo [--format text|json|sarif]  Run built-in adversarial showcase
-  mcp-audit rules                         List all 20 built-in security rules (MCP / TOOL / RUG)
+  mcp-audit demo [--format text|json|sarif|markdown]  Run built-in adversarial showcase
+  mcp-audit rules                         List all 21 built-in security rules (MCP / TOOL / RUG)
 
 OPTIONS:
-  --format <text|json|sarif>              Output format (default: text)
+  --format <text|json|sarif|markdown>     Output format (default: text)
   --fail-on <critical|high|medium|low>    Exit code 1 if any finding meets or exceeds severity
+  --ignore <rule1,rule2>                  Comma-separated rule IDs to suppress (e.g. MCP001,TOOL008)
   --lockfile <path>                       Lockfile path for scan/probe/verify (default: mcp-audit.lock.json)
   --out <path>                            Output path for pin (default: mcp-audit.lock.json)
   --probe                                 Also live-probe stdio & HTTP/SSE servers via JSON-RPC 2.0 tools/list
@@ -125,23 +127,29 @@ async function main(): Promise<void> {
   }
 
   const command = argv[0];
-  let format: "text" | "json" | "sarif" = "text";
+  let format: "text" | "json" | "sarif" | "markdown" = "text";
   let failOn: Severity | undefined;
   let lockfilePath: string | undefined;
   let outPath = "mcp-audit.lock.json";
   let doProbe = command === "probe";
   let doWrite = false;
   let timeoutMs = 5000;
+  const ignoreRules: string[] = [];
   const positional: string[] = [];
 
   for (let i = 1; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--format") {
       const next = argv[++i];
-      if (next === "text" || next === "json" || next === "sarif") {
+      if (next === "text" || next === "json" || next === "sarif" || next === "markdown") {
         format = next;
       } else {
-        throw new Error(`Invalid --format "${next}". Expected text|json|sarif.`);
+        throw new Error(`Invalid --format "${next}". Expected text|json|sarif|markdown.`);
+      }
+    } else if (arg === "--ignore") {
+      const raw = argv[++i] ?? "";
+      for (const id of raw.split(",")) {
+        if (id.trim()) ignoreRules.push(id.trim());
       }
     } else if (arg === "--fail-on") {
       failOn = parseSeverity(argv[++i]);
@@ -202,9 +210,10 @@ async function main(): Promise<void> {
 
   if (command === "demo") {
     const sources = buildDemoSources();
-    const report = auditParsedSources(sources);
+    const report = auditParsedSources(sources, { ignoreRules });
     if (format === "json") console.log(formatJsonReport(report));
     else if (format === "sarif") console.log(formatSarifReport(report, ALL_RULES));
+    else if (format === "markdown") console.log(formatMarkdownReport(report));
     else console.log(formatTextReport(report));
     return;
   }
@@ -245,9 +254,10 @@ async function main(): Promise<void> {
       lockfile = JSON.parse(fs.readFileSync(resolvedLock, "utf8")) as Lockfile;
     }
 
-    const report = auditParsedSources(sources, { lockfile, lockfilePath: effectiveLockPath });
+    const report = auditParsedSources(sources, { lockfile, lockfilePath: effectiveLockPath, ignoreRules });
     if (format === "json") console.log(formatJsonReport(report));
     else if (format === "sarif") console.log(formatSarifReport(report, ALL_RULES));
+    else if (format === "markdown") console.log(formatMarkdownReport(report));
     else console.log(formatTextReport(report));
 
     const effectiveFailOn = failOn ?? (command === "verify" ? "MEDIUM" : undefined);

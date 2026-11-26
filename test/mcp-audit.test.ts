@@ -4,6 +4,7 @@ import {
   ALL_RULES,
   auditParsedSources,
   buildLockfile,
+  formatMarkdownReport,
   formatSarifReport,
   parseMcpJsonContent,
   probeSourcesLive,
@@ -357,4 +358,74 @@ test("SARIF 2.1.0 output conforms to expected schema structure", () => {
   assert.equal(sarif.runs[0]?.tool.driver.name, "mcp-audit");
   assert.equal(sarif.runs[0]?.tool.driver.rules.length, ALL_RULES.length);
   assert.ok((sarif.runs[0]?.results.length ?? 0) >= 1);
+});
+
+test("TOOL009 detects cross-server toxic flow (lethal trifecta) only when all 3 capabilities co-exist", () => {
+  const trifecta = parseObj({
+    mcpServers: {
+      web: {
+        command: "/usr/local/bin/web-mcp",
+        tools: [{ name: "fetch", description: "Fetches an external web page.", inputSchema: { type: "object", properties: {} } }],
+      },
+      files: {
+        command: "/usr/local/bin/fs-mcp",
+        tools: [{ name: "read_file", description: "Reads a local file.", inputSchema: { type: "object", properties: {} } }],
+      },
+      mail: {
+        command: "/usr/local/bin/mail-mcp",
+        tools: [{ name: "send_email", description: "Sends an outbound email.", inputSchema: { type: "object", properties: { to: { type: "string", maxLength: 100 } }, additionalProperties: false } }],
+      },
+    },
+  });
+  const hit = auditParsedSources([trifecta]);
+  assert.ok(hit.findings.some((f) => f.ruleId === "TOOL009"), "Expected TOOL009 to fire on lethal trifecta");
+
+  const safeTwoOfThree = parseObj({
+    mcpServers: {
+      web: {
+        command: "/usr/local/bin/web-mcp",
+        tools: [{ name: "fetch", description: "Fetches an external web page.", inputSchema: { type: "object", properties: {} } }],
+      },
+      files: {
+        command: "/usr/local/bin/fs-mcp",
+        tools: [{ name: "read_file", description: "Reads a local file.", inputSchema: { type: "object", properties: {} } }],
+      },
+    },
+  });
+  const noHit = auditParsedSources([safeTwoOfThree]);
+  assert.equal(noHit.findings.some((f) => f.ruleId === "TOOL009"), false, "Should not fire TOOL009 without outbound sink");
+});
+
+test("ignoreRules suppresses specified rule IDs case-insensitively and recalculates grade", () => {
+  const src = parseObj({
+    mcpServers: {
+      dev: {
+        command: "npx",
+        args: ["-y", "some-mcp"],
+      },
+    },
+  });
+  const before = auditParsedSources([src]);
+  assert.equal(before.summary.grade, "B");
+  assert.ok(before.findings.some((f) => f.ruleId === "MCP001"));
+
+  const after = auditParsedSources([src], { ignoreRules: ["mcp001"] });
+  assert.equal(after.findings.length, 0);
+  assert.equal(after.summary.grade, "A");
+  assert.equal(after.summary.riskScore, 0);
+});
+
+test("formatMarkdownReport outputs a valid GitHub Step Summary table", () => {
+  const src = parseObj({
+    mcpServers: {
+      dev: {
+        command: "npx",
+        args: ["-y", "some-mcp"],
+      },
+    },
+  });
+  const md = formatMarkdownReport(auditParsedSources([src]));
+  assert.ok(md.includes("## mcp-audit v"));
+  assert.ok(md.includes("| Severity | Rule | Target | Detail | Remediation |"));
+  assert.ok(md.includes("`MCP001`"));
 });

@@ -4,7 +4,7 @@ import { getDefaultDiscoveryCandidates, loadMcpFile, parseMcpJsonContent } from 
 import { hardenMcpJsonContent, type HardenChange, type HardenResult } from "./harden.ts";
 import { buildLockfile, RUGPULL_RULES, verifyAgainstLockfile } from "./lockfile.ts";
 import { probeHttpServer, probeStdioServer, type ProbeResult } from "./probe.ts";
-import { formatJsonReport, formatSarifReport, formatTextReport } from "./reporters.ts";
+import { formatJsonReport, formatMarkdownReport, formatSarifReport, formatTextReport } from "./reporters.ts";
 import { auditServerConfig, CONFIG_RULES } from "./rules/config-rules.ts";
 import { auditToolsAcrossServers, TOOL_RULES, type ToolAuditInput } from "./rules/tool-rules.ts";
 import {
@@ -19,13 +19,14 @@ import {
   type Severity,
 } from "./types.ts";
 
-export const TOOL_VERSION = "0.4.0";
+export const TOOL_VERSION = "0.5.0";
 
 export const ALL_RULES: RuleMetadata[] = [...CONFIG_RULES, ...TOOL_RULES, ...RUGPULL_RULES];
 
 export {
   buildLockfile,
   formatJsonReport,
+  formatMarkdownReport,
   formatSarifReport,
   formatTextReport,
   getDefaultDiscoveryCandidates,
@@ -73,9 +74,9 @@ export async function probeSourcesLive(
 
 export function auditParsedSources(
   sources: ParsedMcpSource[],
-  options?: { lockfile?: Lockfile; lockfilePath?: string }
+  options?: { lockfile?: Lockfile; lockfilePath?: string; ignoreRules?: string[] }
 ): AuditReport {
-  const findings: Finding[] = [];
+  let findings: Finding[] = [];
   const toolInputs: ToolAuditInput[] = [];
   let serversScanned = 0;
   let toolsScanned = 0;
@@ -102,6 +103,11 @@ export function auditParsedSources(
     findings.push(
       ...verifyAgainstLockfile(sources, options.lockfile, options.lockfilePath ?? "mcp-audit.lock.json")
     );
+  }
+
+  if (options?.ignoreRules && options.ignoreRules.length > 0) {
+    const ignored = new Set(options.ignoreRules.map((r) => r.trim().toUpperCase()).filter(Boolean));
+    findings = findings.filter((f) => !ignored.has(f.ruleId.toUpperCase()));
   }
 
   findings.sort((a, b) => {

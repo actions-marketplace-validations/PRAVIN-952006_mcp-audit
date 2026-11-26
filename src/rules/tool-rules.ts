@@ -57,6 +57,13 @@ export const TOOL_RULES: RuleMetadata[] = [
     title: "Excessively long tool description (context-stuffing risk)",
     summary: "Flags tool descriptions exceeding 1,500 characters where adversarial instructions can hide below UI folds.",
   },
+  {
+    id: "TOOL009",
+    severity: "HIGH",
+    category: "exfiltration",
+    title: "Cross-server toxic flow (untrusted input + private data + outbound sink)",
+    summary: "Detects the lethal trifecta where untrusted external-content readers, private local/data access, and outbound messaging/network sinks co-exist in one MCP session.",
+  },
 ];
 
 const INJECTION_PATTERNS: Array<{ label: string; regex: RegExp }> = [
@@ -374,6 +381,40 @@ export function auditToolsAcrossServers(inputs: ToolAuditInput[]): Finding[] {
         });
       }
     }
+  }
+
+  // TOOL009: Cross-server Toxic Flow (Lethal Trifecta) detection
+  const UNTRUSTED_IN_RE = /\b(?:fetch|browse|scrape|web_search|search_web|read_issue|get_issue|get_pr|read_email|list_emails|http_get|curl)\b/i;
+  const PRIVATE_READ_RE = /\b(?:read_file|list_files|read_notes|read_env|get_secret|query_db|sql_query|search_files|filesystem)\b/i;
+  const OUTBOUND_SINK_RE = /\b(?:send_email|send_message|post_message|slack_post|http_post|create_issue|create_pr|webhook|upload|publish)\b/i;
+
+  const untrustedTools: string[] = [];
+  const privateTools: string[] = [];
+  const outboundTools: string[] = [];
+  let firstSource = "";
+
+  for (const input of inputs) {
+    if (!firstSource) firstSource = input.sourcePath;
+    for (const tool of input.tools) {
+      const label = `${input.server}.${tool.name}`;
+      const sig = `${tool.name} ${tool.description ?? ""}`;
+      if (UNTRUSTED_IN_RE.test(sig)) untrustedTools.push(label);
+      if (PRIVATE_READ_RE.test(sig)) privateTools.push(label);
+      if (OUTBOUND_SINK_RE.test(sig)) outboundTools.push(label);
+    }
+  }
+
+  if (untrustedTools.length > 0 && privateTools.length > 0 && outboundTools.length > 0) {
+    findings.push({
+      ruleId: "TOOL009",
+      severity: "HIGH",
+      category: "exfiltration",
+      title: "Cross-server toxic flow (lethal trifecta) detected",
+      message: `This MCP session combines untrusted external input (${untrustedTools.slice(0, 3).join(", ")}), private data access (${privateTools.slice(0, 3).join(", ")}), and outbound sinks (${outboundTools.slice(0, 3).join(", ")}), enabling indirect prompt-injection exfiltration.`,
+      source: firstSource,
+      evidence: `in=[${untrustedTools[0]}] -> data=[${privateTools[0]}] -> out=[${outboundTools[0]}]`,
+      remediation: "Isolate untrusted web/issue readers from private-data + outbound-messaging MCP servers, or require explicit human approval before any outbound sink executes.",
+    });
   }
 
   return findings;

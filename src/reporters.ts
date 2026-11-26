@@ -43,6 +43,44 @@ export function formatJsonReport(report: AuditReport): string {
   return JSON.stringify(report, null, 2);
 }
 
+function escapeMdCell(val: string): string {
+  return val.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+export function formatMarkdownReport(report: AuditReport): string {
+  const { summary, findings } = report;
+  const lines: string[] = [];
+
+  lines.push(`## mcp-audit v${report.version} Security Report`);
+  lines.push("");
+  lines.push(
+    `**Grade:** \`${summary.grade}\` | **Risk Score:** \`${summary.riskScore}/100\` | ` +
+      `**Scanned:** ${summary.filesScanned} file(s), ${summary.serversScanned} server(s), ${summary.toolsScanned} tool(s)`
+  );
+  lines.push(
+    `**Findings:** ${findings.length} (` +
+      `${summary.counts.CRITICAL} critical, ${summary.counts.HIGH} high, ` +
+      `${summary.counts.MEDIUM} medium, ${summary.counts.LOW} low)`
+  );
+  lines.push("");
+
+  if (findings.length === 0) {
+    lines.push("> **PASS:** No security issues detected.");
+    return lines.join("\n");
+  }
+
+  lines.push("| Severity | Rule | Target | Detail | Remediation |");
+  lines.push("| :--- | :--- | :--- | :--- | :--- |");
+  for (const f of findings) {
+    const target = [f.server, f.tool].filter(Boolean).join(" / ") || f.source;
+    lines.push(
+      `| **${f.severity}** | \`${f.ruleId}\` | ${escapeMdCell(target)} | ${escapeMdCell(f.message)} | ${escapeMdCell(f.remediation)} |`
+    );
+  }
+
+  return lines.join("\n");
+}
+
 function sarifLevel(sev: Severity): "error" | "warning" | "note" {
   if (sev === "CRITICAL" || sev === "HIGH") return "error";
   if (sev === "MEDIUM") return "warning";
